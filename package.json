@@ -1,0 +1,37 @@
+{
+  "name": "impara-italian",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Italian A0-B2 learning web app for CLI Pisa proficiency",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "db:init": "sqlite3 impara.db < db/schema.sql"
+  },
+  "keywords": [
+    "italian",
+    "language-learning",
+    "cefr",
+    "cli-pisa",
+    "conjugation"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.28.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.3",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.10",
+    "vitest": "^2.1.8"
+  }
+}

@@ -1,0 +1,21 @@
+# Netlify build settings for the Impara Vite SPA.
+# Vite outputs a static site to dist/; Netlify serves it.
+
+[build]
+  # Vite compiles with esbuild and produces the static site in dist/.
+  # We call vite directly (not `npm run build`) so a stray TypeScript type
+  # error can't block the deploy — run `npm run typecheck` locally to catch those.
+  command = "vite build"
+  publish = "dist"
+
+[build.environment]
+  # Vite 5 + vitest need a modern Node.
+  NODE_VERSION = "20"
+
+# SPA fallback: send every path to index.html so deep links resolve.
+# (The app uses HashRouter, so this is belt-and-suspenders — and keeps
+#  things working if you ever switch to BrowserRouter.)
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
