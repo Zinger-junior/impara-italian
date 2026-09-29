@@ -19,7 +19,7 @@ import { openDatabase, get, putMany, put } from "./idb.js";
 import { addDays, daysBetween, toISODate, today } from "../util/date.js";
 
 export const DB_NAME = "impara";
-export const DB_VERSION = 2;
+export const DB_VERSION = 3;
 export const PLAN_LENGTH_DAYS = 365;
 
 // ---- Record types -----------------------------------------------------------
@@ -46,6 +46,10 @@ export interface LessonProgressRecord {
   scorePct?: number;
   /** ISO date the lesson was completed (present when status === completed). */
   completedAt?: string;
+  /** ISO date of the most recent passing check (for spaced review). */
+  lastReviewedAt?: string;
+  /** Number of times the lesson check has been passed (drives review spacing). */
+  reviewCount?: number;
   timeSpentSeconds: number;
 }
 
@@ -84,6 +88,28 @@ export interface PronunciationAttemptRecord {
   accuracyPct: number;
 }
 
+/** A vocabulary card with a Leitner box (1 = new/weak … 5 = mastered). */
+export interface VocabRecord {
+  id?: number; // autoIncrement
+  it: string;
+  en: string;
+  /** Leitner box, 1..5. */
+  box: number;
+  /** Optional theme (from the core pack) or "custom". */
+  theme?: string;
+  addedAt: string; // ISO date
+  lastReviewedAt?: string;
+}
+
+/** A logged mistake to review later. */
+export interface MistakeRecord {
+  id?: number; // autoIncrement
+  bad: string;
+  good: string;
+  note?: string;
+  addedAt: string; // ISO date
+}
+
 // ---- Open -------------------------------------------------------------------
 
 let dbPromise: Promise<IDBDatabase> | null = null;
@@ -110,6 +136,13 @@ export async function getDb(): Promise<IDBDatabase> {
       }
       if (!db.objectStoreNames.contains("pronunciationAttempts")) {
         db.createObjectStore("pronunciationAttempts", { keyPath: "id", autoIncrement: true });
+      }
+      // v3: vocabulary (Leitner) + mistake log.
+      if (!db.objectStoreNames.contains("vocab")) {
+        db.createObjectStore("vocab", { keyPath: "id", autoIncrement: true });
+      }
+      if (!db.objectStoreNames.contains("mistakes")) {
+        db.createObjectStore("mistakes", { keyPath: "id", autoIncrement: true });
       }
     });
   }

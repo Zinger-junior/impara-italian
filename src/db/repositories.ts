@@ -8,12 +8,14 @@ import { getDb } from "./store.js";
 import type {
   LessonProgressRecord,
   MilestoneRecord,
+  MistakeRecord,
   PronunciationAttemptRecord,
   QuizResultRecord,
   StudySessionRecord,
   UserRecord,
+  VocabRecord,
 } from "./store.js";
-import { get, getAll, put, clearStore } from "./idb.js";
+import { get, getAll, put, putMany, del, clearStore } from "./idb.js";
 import { toISODate, today } from "../util/date.js";
 
 // ---- User -------------------------------------------------------------------
@@ -79,6 +81,47 @@ export async function setLessonCompleted(
   if (completed) await addStudyMinutes(minutes);
 }
 
+/**
+ * Record a lesson-check attempt. A pass (scorePct >= passThreshold) marks the
+ * lesson completed and unlocks the next; a fail is stored as in_progress so it
+ * neither unlocks the next lesson nor inflates completion counts. Retaking never
+ * relocks: a previous pass and the best score are always kept.
+ */
+export async function recordLessonCheck(
+  lessonSlug: string,
+  levelCode: LessonProgressRecord["levelCode"],
+  scorePct: number,
+  opts: { minutes?: number; passThreshold?: number } = {},
+): Promise<{ passed: boolean; bestScore: number }> {
+  const db = await getDb();
+  const existing = await get<LessonProgressRecord>(db, "lessonProgress", lessonSlug);
+  const threshold = opts.passThreshold ?? 70;
+  const minutes = opts.minutes ?? 15;
+
+  const prevPassed = existing?.status === "completed" && (existing.scorePct ?? 0) >= threshold;
+  const passed = prevPassed || scorePct >= threshold;
+  const bestScore = Math.max(scorePct, existing?.scorePct ?? 0);
+
+  const record: LessonProgressRecord = {
+    lessonSlug,
+    levelCode,
+    status: passed ? "completed" : "in_progress",
+    scorePct: bestScore,
+    timeSpentSeconds: (existing?.timeSpentSeconds ?? 0) + minutes * 60,
+    ...(passed
+      ? {
+          completedAt: existing?.completedAt ?? toISODate(today()),
+          lastReviewedAt: toISODate(today()),
+          reviewCount: (existing?.reviewCount ?? 0) + 1,
+        }
+      : {}),
+  };
+  await put(db, "lessonProgress", record);
+  await addStudyMinutes(minutes);
+
+  return { passed, bestScore };
+}
+
 // ---- Study sessions ---------------------------------------------------------
 
 export async function getStudySessions(): Promise<StudySessionRecord[]> {
@@ -131,6 +174,94 @@ export async function getPronunciationAttempts(): Promise<PronunciationAttemptRe
   return rows.sort((a, b) => b.takenAt.localeCompare(a.takenAt));
 }
 
+// ---- Vocabulary (Leitner SRS) ----------------------------------------------
+
+export async function getVocab(): Promise<VocabRecord[]> {
+  const db = await getDb();
+  return getAll<VocabRecord>(db, "vocab");
+}
+
+/** Add one word. Returns false if the Italian side already exists (case-insensitive). */
+export async function addVocabWord(it: string, en: string, theme?: string): Promise<boolean> {
+  const db = await getDb();
+  const existing = await getAll<VocabRecord>(db, "vocab");
+  const key = it.trim().toLowerCase();
+  if (!key || existing.some((v) => v.it.trim().toLowerCase() === key)) return false;
+  const record: VocabRecord = {
+    it: it.trim(),
+    en: en.trim(),
+    box: 1,
+    addedAt: toISODate(today()),
+    ...(theme ? { theme } : {}),
+  };
+  await put(db, "vocab", record);
+  return true;
+}
+
+/** Bulk add (for the core pack), skipping duplicates. Returns how many were added. */
+export async function addVocabWords(
+  words: { it: string; en: string; theme?: string }[],
+): Promise<number> {
+  const db = await getDb();
+  const existing = await getAll<VocabRecord>(db, "vocab");
+  const seen = new Set(existing.map((v) => v.it.trim().toLowerCase()));
+  const fresh: VocabRecord[] = [];
+  for (const w of words) {
+    const key = w.it.trim().toLowerCase();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    fresh.push({
+      it: w.it.trim(),
+      en: w.en.trim(),
+      box: 1,
+      addedAt: toISODate(today()),
+      ...(w.theme ? { theme: w.theme } : {}),
+    });
+  }
+  if (fresh.length) await putMany(db, "vocab", fresh);
+  return fresh.length;
+}
+
+/** Update a word's Leitner box after a review (clamped 1..5). */
+export async function setVocabBox(record: VocabRecord, box: number): Promise<void> {
+  const db = await getDb();
+  const updated: VocabRecord = {
+    ...record,
+    box: Math.max(1, Math.min(5, box)),
+    lastReviewedAt: toISODate(today()),
+  };
+  await put(db, "vocab", updated);
+}
+
+export async function deleteVocabWord(id: number): Promise<void> {
+  const db = await getDb();
+  await del(db, "vocab", id);
+}
+
+// ---- Mistake log ------------------------------------------------------------
+
+export async function getMistakes(): Promise<MistakeRecord[]> {
+  const db = await getDb();
+  const rows = await getAll<MistakeRecord>(db, "mistakes");
+  return rows.sort((a, b) => b.addedAt.localeCompare(a.addedAt));
+}
+
+export async function addMistake(bad: string, good: string, note?: string): Promise<void> {
+  const db = await getDb();
+  const record: MistakeRecord = {
+    bad: bad.trim(),
+    good: good.trim(),
+    addedAt: toISODate(today()),
+    ...(note && note.trim() ? { note: note.trim() } : {}),
+  };
+  await put(db, "mistakes", record);
+}
+
+export async function deleteMistake(id: number): Promise<void> {
+  const db = await getDb();
+  await del(db, "mistakes", id);
+}
+
 // ---- Maintenance ------------------------------------------------------------
 
 /** Wipe all user data. The next getDb() call re-seeds from scratch. */
@@ -142,4 +273,6 @@ export async function resetAll(): Promise<void> {
   await clearStore(db, "milestones");
   await clearStore(db, "quizResults");
   await clearStore(db, "pronunciationAttempts");
+  await clearStore(db, "vocab");
+  await clearStore(db, "mistakes");
 }

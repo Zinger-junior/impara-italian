@@ -191,3 +191,20 @@ export function Box(props: { style?: CSSProperties; className?: string; children
     </div>
   );
 }
+
+// ---- RichText: renders **bold** spans inside plain data strings -------------
+
+export function RichText(props: { text: string }) {
+  const parts = props.text.split(/(\*\*[^*]+\*\*)/g);
+  return (
+    <>
+      {parts.map((part, i) =>
+        part.startsWith("**") && part.endsWith("**") ? (
+          <strong key={i}>{part.slice(2, -2)}</strong>
+        ) : (
+          <span key={i}>{part}</span>
+        ),
+      )}
+    </>
+  );
+}

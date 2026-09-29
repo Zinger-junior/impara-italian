@@ -10,7 +10,9 @@ export type StoreName =
   | "studySessions"
   | "milestones"
   | "quizResults"
-  | "pronunciationAttempts";
+  | "pronunciationAttempts"
+  | "vocab"
+  | "mistakes";
 
 /** Promisify an IDBRequest. */
 export function promisifyRequest<T>(request: IDBRequest<T>): Promise<T> {
@@ -87,4 +89,19 @@ export async function clearStore(db: IDBDatabase, store: StoreName): Promise<voi
   const tx = db.transaction(store, "readwrite");
   tx.objectStore(store).clear();
   await txDone(tx);
+}
+
+/** Delete a single record by key. */
+export async function del(db: IDBDatabase, store: StoreName, key: IDBValidKey): Promise<void> {
+  const tx = db.transaction(store, "readwrite");
+  tx.objectStore(store).delete(key);
+  await txDone(tx);
+}
+
+/** Insert a record and resolve with its generated key (for autoIncrement stores). */
+export async function add<T>(db: IDBDatabase, store: StoreName, value: T): Promise<IDBValidKey> {
+  const tx = db.transaction(store, "readwrite");
+  const key = await promisifyRequest(tx.objectStore(store).add(value as unknown as object));
+  await txDone(tx);
+  return key;
 }

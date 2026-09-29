@@ -29,13 +29,44 @@ function useTheme(): [Theme, (t: Theme) => void] {
   return [theme, setTheme];
 }
 
-const NAV = [
-  { to: "/", label: "Dashboard", icon: "◈", end: true },
-  { to: "/curriculum", label: "Curriculum", icon: "▤", end: false },
-  { to: "/quiz", label: "Practice", icon: "✎", end: false },
-  { to: "/exam", label: "Mock exam", icon: "◆", end: false },
-  { to: "/timeline", label: "Timeline", icon: "◔", end: false },
-  { to: "/diagnostics", label: "Diagnostics", icon: "◇", end: false },
+const NAV_SECTIONS: { label: string; items: { to: string; label: string; icon: string; end?: boolean }[] }[] = [
+  {
+    label: "Learn",
+    items: [
+      { to: "/", label: "Dashboard", icon: "◈", end: true },
+      { to: "/curriculum", label: "Curriculum", icon: "▤" },
+      { to: "/grammar", label: "Grammar", icon: "¶" },
+      { to: "/listening", label: "Listening", icon: "♪" },
+    ],
+  },
+  {
+    label: "Practise",
+    items: [
+      { to: "/drill", label: "Conjugation drill", icon: "↻" },
+      { to: "/quiz", label: "Quiz", icon: "✎" },
+      { to: "/vocabulary", label: "Vocabulary", icon: "▦" },
+      { to: "/review", label: "Review mistakes", icon: "↺" },
+      { to: "/writing", label: "Writing", icon: "✍" },
+      { to: "/exam", label: "Mock exam", icon: "◆" },
+    ],
+  },
+  {
+    label: "Reference",
+    items: [
+      { to: "/phrasebook", label: "Phrasebook", icon: "❝" },
+      { to: "/verbs", label: "Verb tables", icon: "▧" },
+      { to: "/resources", label: "Toolkit", icon: "◎" },
+      { to: "/guide", label: "Guide", icon: "☰" },
+    ],
+  },
+  {
+    label: "Plan",
+    items: [
+      { to: "/timeline", label: "Timeline", icon: "◔" },
+      { to: "/diagnostics", label: "Diagnostics", icon: "◇" },
+      { to: "/settings", label: "Settings", icon: "⚙" },
+    ],
+  },
 ];
 
 export function AppShell(props: { children: ReactNode }) {
@@ -65,16 +96,21 @@ export function AppShell(props: { children: ReactNode }) {
         </div>
 
         <nav className="nav" aria-label="Primary">
-          {NAV.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end={item.end}
-              className={({ isActive }) => `nav__link${isActive ? " nav__link--active" : ""}`}
-            >
-              <span aria-hidden="true">{item.icon}</span>
-              {item.label}
-            </NavLink>
+          {NAV_SECTIONS.map((section) => (
+            <div className="nav__section" key={section.label}>
+              <div className="nav__section-label">{section.label}</div>
+              {section.items.map((item) => (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  end={item.end}
+                  className={({ isActive }) => `nav__link${isActive ? " nav__link--active" : ""}`}
+                >
+                  <span aria-hidden="true">{item.icon}</span>
+                  {item.label}
+                </NavLink>
+              ))}
+            </div>
           ))}
         </nav>
 
