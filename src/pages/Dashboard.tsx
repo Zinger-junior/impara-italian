@@ -4,7 +4,7 @@
 // timeline chart, and upcoming milestones. All data comes from IndexedDB.
 // =============================================================================
 
-import { Card, ErrorState, PageHead, ProgressRow, Spinner, Stat, Badge } from "../ui/components.js";
+import { Card, ErrorState, PageHead, ProgressBar, ProgressRow, Spinner, Stat, Badge } from "../ui/components.js";
 import { Link } from "react-router-dom";
 import { TimelineChart } from "../ui/TimelineChart.js";
 import type { ChartMilestone } from "../ui/TimelineChart.js";
@@ -22,7 +22,8 @@ import { nextLesson } from "../progress/gating.js";
 import { dueReviews } from "../progress/review.js";
 import { computeAchievements, earnedCount } from "../data/achievements.js";
 import { buildTimeline, lessonsPerLevel, planStatus, totalLessonCount } from "../progress/timeline.js";
-import { fromISODate, formatShort, today } from "../util/date.js";
+import { fromISODate, formatShort, toISODate, today } from "../util/date.js";
+import { CEFR_ORDER } from "../types/index.js";
 import type { LessonProgressRecord, MilestoneRecord, MistakeRecord, StudySessionRecord, UserRecord, VocabRecord } from "../db/store.js";
 
 interface Bundle {
@@ -70,8 +71,25 @@ export function Dashboard() {
   const status = planStatus(points);
   const daysLeft = daysUntilExam(user.targetExamDate);
   const cumByLevel = cumulativeLessonsByLevel();
-  const next = nextLesson(progress);
+  const next = nextLesson(progress, user.entryCefr);
   const due = dueReviews(progress);
+
+  // Today's study against the daily goal from onboarding.
+  const todayIso = toISODate(today());
+  const todayMinutes = sessions.find((s) => s.date === todayIso)?.minutes ?? 0;
+  const goalMinutes = user.minutesPerDay ?? 20;
+  const todayPct = Math.min(100, Math.round((todayMinutes / goalMinutes) * 100));
+
+  // Gentle level-up nudge: consistently high scores suggest trying the next level.
+  const scored = [...progress.values()]
+    .filter((r) => r.status === "completed" && typeof r.scorePct === "number")
+    .map((r) => r.scorePct as number);
+  const avgScore = scored.length ? Math.round(scored.reduce((a, b) => a + b, 0) / scored.length) : 0;
+  const entryIdx = CEFR_ORDER.indexOf(user.entryCefr);
+  const suggestLevel =
+    scored.length >= 3 && avgScore >= 90 && entryIdx >= 0 && entryIdx < CEFR_ORDER.length - 1
+      ? CEFR_ORDER[entryIdx + 1] ?? null
+      : null;
 
   const achievementCtx = {
     lessonsPassed: stats.lessonsCompleted,
@@ -109,7 +127,7 @@ export function Dashboard() {
       <PageHead
         title={`Ciao, ${user.displayName}`}
         badge={<Badge variant={statusVariant} dot>{statusText}</Badge>}
-        sub={`Targeting CLI Pisa on ${formatShort(fromISODate(user.targetExamDate))} — ${daysLeft} days to go.`}
+        sub={`${user.goal ? user.goal + " · " : ""}Targeting CLI Pisa on ${formatShort(fromISODate(user.targetExamDate))} — ${daysLeft} days to go.`}
       />
 
       <div className="grid grid--stats" style={{ marginBottom: 24 }}>
@@ -141,6 +159,35 @@ export function Dashboard() {
             <span className="muted"> Keep them sharp with the drill and mock exam.</span>
           </div>
         )}
+      </div>
+
+      {suggestLevel && (
+        <div className="notice" style={{ marginBottom: 24 }}>
+          You're averaging <strong>{avgScore}%</strong> on your checks — you might be ready for{" "}
+          <strong>{suggestLevel}</strong>. <Link to="/settings">Change your level →</Link>
+        </div>
+      )}
+
+      <div className="grid grid--2" style={{ marginBottom: 24 }}>
+        <Card title="Today" hint="Your daily study goal">
+          <div className="row row--between" style={{ marginBottom: 6 }}>
+            <span className="muted">{todayMinutes} of {goalMinutes} min</span>
+            <strong>{todayPct}%</strong>
+          </div>
+          <ProgressBar pct={todayPct} label="today's goal" />
+          <div className="chip-row" style={{ marginTop: 14 }}>
+            <Link className="chip-link" to="/curriculum">Continue</Link>
+            <Link className="chip-link" to="/review">Review{due.length ? ` (${due.length})` : ""}</Link>
+            <Link className="chip-link" to="/drill">Drill</Link>
+            <Link className="chip-link" to="/listening">Listen</Link>
+          </div>
+        </Card>
+
+        <Card title="Your goal">
+          <div style={{ fontWeight: 600, marginBottom: 4 }}>{user.goal ?? "Learn Italian"}</div>
+          <div className="muted">Target: {formatShort(fromISODate(user.targetExamDate))} · {daysLeft} days to go</div>
+          <div className="muted" style={{ marginTop: 6 }}>Starting level: {user.entryCefr}</div>
+        </Card>
       </div>
 
       <div className="grid grid--2" style={{ marginBottom: 24 }}>

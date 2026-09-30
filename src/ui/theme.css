@@ -780,3 +780,48 @@ code {
   background: var(--critical); border-color: transparent; color: #fff;
 }
 .btn--danger:hover { filter: brightness(0.95); background: var(--critical); }
+
+/* ---- Auth screens -------------------------------------------------------- */
+
+.auth-screen {
+  min-height: 100vh; display: flex; flex-direction: column; align-items: center;
+  overflow-y: auto; padding: var(--s-5); background: var(--page);
+}
+.auth-card {
+  width: 100%; max-width: 380px; margin: auto; display: flex; flex-direction: column; gap: var(--s-4);
+  background: var(--surface-1); border: 1px solid var(--border); border-radius: var(--r-lg);
+  padding: var(--s-6); box-shadow: var(--shadow-2);
+}
+.onboard-card { max-width: 560px; }
+.onboard-section { display: flex; flex-direction: column; gap: 6px; }
+
+.onboard-levels { display: flex; flex-direction: column; gap: 8px; }
+.level-pick {
+  text-align: left; border: 1.5px solid var(--border); background: var(--surface-1); color: var(--text-primary);
+  border-radius: var(--r-md); padding: var(--s-3) var(--s-4); cursor: pointer; font: inherit;
+  display: flex; flex-direction: column; gap: 2px; transition: border-color 0.15s ease, background 0.15s ease;
+}
+.level-pick:hover { border-color: var(--series-1); }
+.level-pick--active { border-color: var(--series-1); background: var(--series-1-soft); }
+.level-pick__name { font-weight: 650; }
+.level-pick__blurb { font-size: 0.83rem; color: var(--text-secondary); }
+
+.chip-row { display: flex; flex-wrap: wrap; gap: var(--s-2); }
+.placed-chip {
+  background: var(--surface-2); color: var(--text-secondary);
+  border-color: var(--border);
+}
+.auth-form { display: flex; flex-direction: column; gap: var(--s-3); }
+.auth-form .settings-field { margin-bottom: 0; max-width: none; }
+.auth-form .btn { margin-top: var(--s-2); }
+
+/* ---- Sidebar account ----------------------------------------------------- */
+
+.nav__account {
+  display: flex; flex-direction: column; gap: 6px;
+  padding: var(--s-3); border-radius: var(--r-md); background: var(--surface-2);
+}
+.nav__account-email {
+  font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}

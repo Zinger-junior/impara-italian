@@ -1,11 +1,16 @@
 // =============================================================================
 // src/app/App.tsx
-// Route table wrapped in the responsive AppShell. HashRouter keeps the app
-// fully client-side (no server rewrite rules needed for static hosting).
+// Route table wrapped in the responsive AppShell. HashRouter keeps the app fully
+// client-side. When cloud accounts are configured, the whole app sits behind the
+// auth Gate, and SyncManager keeps the signed-in user's progress backed up.
 // =============================================================================
 
-import { HashRouter, Route, Routes } from "react-router-dom";
+import { useEffect } from "react";
+import { HashRouter, Route, Routes, useLocation } from "react-router-dom";
 import { AppShell } from "../ui/AppShell.js";
+import { AuthProvider } from "../auth/AuthContext.js";
+import { Gate } from "../auth/Gate.js";
+import { pushSnapshot, scheduleSync } from "../cloud/sync.js";
 import { Dashboard } from "../pages/Dashboard.js";
 import { CurriculumBrowser } from "../pages/CurriculumBrowser.js";
 import { Timeline } from "../pages/Timeline.js";
@@ -24,9 +29,33 @@ import { Verbs } from "../pages/Verbs.js";
 import { Writing } from "../pages/Writing.js";
 import { Settings } from "../pages/Settings.js";
 
-export function App() {
+/** Backs up the signed-in user's data on navigation, tab-hide, and a timer. */
+function SyncManager() {
+  const loc = useLocation();
+  useEffect(() => {
+    scheduleSync();
+  }, [loc.pathname]);
+  useEffect(() => {
+    const onVisibility = () => {
+      if (document.hidden) void pushSnapshot();
+    };
+    const onHide = () => void pushSnapshot();
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("pagehide", onHide);
+    const iv = window.setInterval(() => void pushSnapshot(), 30000);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("pagehide", onHide);
+      window.clearInterval(iv);
+    };
+  }, []);
+  return null;
+}
+
+function AppRoutes() {
   return (
     <HashRouter>
+      <SyncManager />
       <AppShell>
         <Routes>
           <Route path="/" element={<Dashboard />} />
@@ -50,5 +79,15 @@ export function App() {
         </Routes>
       </AppShell>
     </HashRouter>
+  );
+}
+
+export function App() {
+  return (
+    <AuthProvider>
+      <Gate>
+        <AppRoutes />
+      </Gate>
+    </AuthProvider>
   );
 }

@@ -4,7 +4,7 @@
 // directly. Every function opens the (memoised) db and seeds on first use.
 // =============================================================================
 
-import { getDb } from "./store.js";
+import { getDb, seedFresh } from "./store.js";
 import type {
   LessonProgressRecord,
   MilestoneRecord,
@@ -264,7 +264,7 @@ export async function deleteMistake(id: number): Promise<void> {
 
 // ---- Maintenance ------------------------------------------------------------
 
-/** Wipe all user data. The next getDb() call re-seeds from scratch. */
+/** Wipe all user data and re-create the clean starting state. */
 export async function resetAll(): Promise<void> {
   const db = await getDb();
   await clearStore(db, "meta");
@@ -275,4 +275,7 @@ export async function resetAll(): Promise<void> {
   await clearStore(db, "pronunciationAttempts");
   await clearStore(db, "vocab");
   await clearStore(db, "mistakes");
+  // Recreate the fresh user + plan immediately, so callers that don't reload
+  // the page still find a valid (empty) state instead of a missing user.
+  await seedFresh(db);
 }

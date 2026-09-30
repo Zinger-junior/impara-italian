@@ -14,7 +14,7 @@ import { LessonCheckRunner } from "../ui/LessonCheckRunner.js";
 import { useAsync } from "../hooks/useAsync.js";
 import { useSpeech } from "../hooks/useSpeech.js";
 import type { UseSpeech } from "../hooks/useSpeech.js";
-import { getProgressMap, recordLessonCheck, setLessonCompleted } from "../db/repositories.js";
+import { getProgressMap, getUser, recordLessonCheck, setLessonCompleted } from "../db/repositories.js";
 import { CURRICULUM } from "../data/curriculum.js";
 import { LESSON_DETAIL } from "../data/lessonDetail.js";
 import type { LessonDetail } from "../data/lessonDetail.js";
@@ -30,23 +30,29 @@ import type { LessonProgressRecord } from "../db/store.js";
 
 type Filter = "all" | CefrLevel;
 
+interface Bundle {
+  progress: Map<string, LessonProgressRecord>;
+  entryLevel: CefrLevel;
+}
+
 export function CurriculumBrowser() {
   const [filter, setFilter] = useState<Filter>("all");
-  const { loading, error, value, reload } = useAsync<Map<string, LessonProgressRecord>>(
-    () => getProgressMap(),
-    [],
-  );
+  const { loading, error, value, reload } = useAsync<Bundle>(async () => {
+    const [progress, user] = await Promise.all([getProgressMap(), getUser()]);
+    return { progress, entryLevel: user.entryCefr };
+  }, []);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const speech = useSpeech();
 
   if (loading) return <Spinner />;
   if (error) return <ErrorState error={error} onRetry={reload} />;
-  const progress = value ?? new Map();
+  const progress = value?.progress ?? new Map<string, LessonProgressRecord>();
+  const entryLevel = value?.entryLevel ?? "A0";
 
   const levels = CURRICULUM.levels.filter((l) => filter === "all" || l.code === filter);
   const progressByLevel = new Map(levelProgress(progress).map((l) => [l.code, l]));
-  const gates = gateMap(progress);
-  const next = nextLesson(progress);
+  const gates = gateMap(progress, entryLevel);
+  const next = nextLesson(progress, entryLevel);
   const dueSet = dueSlugSet(progress);
 
   const toggleExpand = (slug: string) =>
@@ -124,7 +130,7 @@ export function CurriculumBrowser() {
               <div className="unit" key={unit.slug}>
                 <div className="unit__title">{unit.title}</div>
                 {unit.lessons.map((lesson) => {
-                  const gate: LessonGate = gates.get(lesson.slug) ?? { locked: false, passed: false, attempted: false };
+                  const gate: LessonGate = gates.get(lesson.slug) ?? { locked: false, passed: false, placedOut: false, attempted: false };
                   const isOpen = expanded.has(lesson.slug);
                   const detail = LESSON_DETAIL[lesson.slug];
                   const check = LESSON_CHECKS[lesson.slug];
@@ -151,6 +157,7 @@ export function CurriculumBrowser() {
                             {gate.scorePct}%
                           </span>
                         )}
+                        {gate.placedOut && <span className="due-chip placed-chip">Placed out</span>}
                         {gate.passed && dueSet.has(lesson.slug) && (
                           <span className="due-chip" title="Due for a spaced review">↻ Review</span>
                         )}

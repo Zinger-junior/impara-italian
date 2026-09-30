@@ -8,15 +8,15 @@
 //   studySessions   date (YYYY-MM-DD) -> StudySessionRecord
 //   milestones      id (autoIncrement) -> MilestoneRecord
 //
-// First run seeds a demo learner with a 1-year plan and a modest, clearly
-// labelled sample of real progress so the dashboard and timeline render with
-// data. resetAll() (in repositories) wipes it back to a clean seed.
+// First run seeds a fresh learner: a 1-year plan starting today, the end-of-level
+// milestone checkpoints, and zero progress. Lessons are unlocked by passing their
+// checks. resetAll() (in repositories) wipes back to this same clean state.
 // =============================================================================
 
 import type { CefrLevel } from "../types/index.js";
 import { CURRICULUM } from "../data/curriculum.js";
 import { openDatabase, get, putMany, put } from "./idb.js";
-import { addDays, daysBetween, toISODate, today } from "../util/date.js";
+import { addDays, toISODate, today } from "../util/date.js";
 
 export const DB_NAME = "impara";
 export const DB_VERSION = 3;
@@ -35,6 +35,12 @@ export interface UserRecord {
   /** ISO date of the target CLI Pisa exam. */
   targetExamDate: string;
   timezone: string;
+  /** Why they're learning (from onboarding). */
+  goal?: string;
+  /** Daily study intention in minutes (from onboarding). */
+  minutesPerDay?: number;
+  /** ISO date the onboarding survey was completed. Absent = not yet onboarded. */
+  onboardedAt?: string;
 }
 
 export type LessonStatus = "not_started" | "in_progress" | "completed";
@@ -169,7 +175,8 @@ async function seedIfEmpty(db: IDBDatabase): Promise<void> {
   const existing = await get<UserRecord>(db, "meta", "user");
   if (existing) return;
 
-  const start = addDays(today(), -21); // plan began 3 weeks ago
+  // A genuine clean start: the plan begins today with zero progress.
+  const start = today();
   const target = addDays(start, PLAN_LENGTH_DAYS);
 
   const user: UserRecord = {
@@ -184,52 +191,19 @@ async function seedIfEmpty(db: IDBDatabase): Promise<void> {
   };
   await put(db, "meta", user);
 
-  // --- Sample completed lessons: the first A0 unit + a couple of A1 lessons,
-  //     with completion dates spread across the past three weeks. ---
-  const seededLessons: { levelCode: CefrLevel; slug: string; daysAgo: number; score: number }[] = [
-    { levelCode: "A0", slug: "alfabeto", daysAgo: 20, score: 100 },
-    { levelCode: "A0", slug: "suoni-difficili", daysAgo: 18, score: 90 },
-    { levelCode: "A0", slug: "saluti", daysAgo: 15, score: 95 },
-    { levelCode: "A0", slug: "mi-chiamo", daysAgo: 13, score: 88 },
-    { levelCode: "A1", slug: "presente-essere", daysAgo: 9, score: 92 },
-    { levelCode: "A1", slug: "presente-avere", daysAgo: 6, score: 84 },
-    { levelCode: "A1", slug: "verbi-are", daysAgo: 2, score: 78 },
-  ];
-
-  const progress: LessonProgressRecord[] = seededLessons.map((s) => ({
-    lessonSlug: s.slug,
-    levelCode: s.levelCode,
-    status: "completed",
-    scorePct: s.score,
-    completedAt: toISODate(addDays(today(), -s.daysAgo)),
-    timeSpentSeconds: 20 * 60,
-  }));
-  await putMany(db, "lessonProgress", progress);
-
-  // --- Study sessions: most days over the past three weeks. ---
-  const sessions: StudySessionRecord[] = [];
-  for (let d = 21; d >= 0; d--) {
-    // Skip a few days to make the streak realistic rather than perfect.
-    if (d === 17 || d === 12 || d === 5) continue;
-    const date = toISODate(addDays(today(), -d));
-    const minutes = 15 + ((d * 7) % 30); // deterministic 15–44 min
-    sessions.push({ date, minutes, xp: minutes * 3 });
-  }
-  await putMany(db, "studySessions", sessions);
-
-  // --- Milestones: end-of-level checkpoints across the 1-year plan. ---
+  // Plan checkpoints only — end-of-level target dates, none achieved yet.
+  // No lessons, scores, study sessions, or streaks are fabricated: a new
+  // learner starts at zero and unlocks lessons by passing their checks.
   const ends = levelEndDates(start);
-  const milestones: MilestoneRecord[] = ends.map(({ level, date }) => {
-    const record: MilestoneRecord = {
-      label: `Complete ${level}`,
-      targetLevel: level,
-      targetDate: toISODate(date),
-    };
-    // Mark A0 achieved (its sample lessons are all done and its date has passed).
-    if (level === "A0" && daysBetween(date, today()) >= 0) {
-      record.achievedAt = toISODate(addDays(today(), -12));
-    }
-    return record;
-  });
+  const milestones: MilestoneRecord[] = ends.map(({ level, date }) => ({
+    label: `Complete ${level}`,
+    targetLevel: level,
+    targetDate: toISODate(date),
+  }));
   await putMany(db, "milestones", milestones);
+}
+
+/** Re-create the clean starting state after a wipe. Exported for resetAll(). */
+export async function seedFresh(db: IDBDatabase): Promise<void> {
+  await seedIfEmpty(db);
 }
