@@ -255,17 +255,9 @@ Content in `src/data/writingPrompts.ts`.
 **Settings** — a settings page (Plan → Settings) to edit your display name and
 target exam date, and a danger zone to reset all progress back to a clean start.
 
-**Cloud accounts (optional)** — with Supabase configured, the app requires sign-up /
-sign-in and stores each user's progress privately in the cloud, synced across
-devices; without it, the app runs local-only (no login, one browser). The whole
-local dataset is snapshotted to a per-user row (row-level security keeps it
-private) on login-pull / background-push. Auth lives in `src/auth/`, the client and
-sync in `src/cloud/`. Includes **forgot-password / reset** via email. **Setup: see
-[`SUPABASE_SETUP.md`](./SUPABASE_SETUP.md).**
-
-**Onboarding survey** — on first run / right after sign-up, a short survey collects
-name, current level, goal, daily time, and target test date (`src/pages/Onboarding.tsx`,
-gated by `src/auth/OnboardingGate.tsx`). It's saved to the user record and shown once.
+**Onboarding survey** — on first run a short survey collects name, current level,
+goal, daily time, and target test date (`src/pages/Onboarding.tsx`, gated by
+`src/auth/OnboardingGate.tsx`). It's saved to the user record and shown once.
 
 **Start from any level** — the chosen entry level drives unlocking: lessons in levels
 below it are "placed out" (open for review, not required, and they don't block the

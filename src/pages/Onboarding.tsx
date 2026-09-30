@@ -12,8 +12,6 @@ import { useAsync } from "../hooks/useAsync.js";
 import { getUser, saveUser } from "../db/repositories.js";
 import type { UserRecord } from "../db/store.js";
 import { toISODate, today } from "../util/date.js";
-import { cloudEnabled } from "../cloud/supabase.js";
-import { pushSnapshot } from "../cloud/sync.js";
 import type { CefrLevel } from "../types/index.js";
 
 const LEVELS: { code: CefrLevel; name: string; blurb: string }[] = [
@@ -69,7 +67,6 @@ export function Onboarding(props: { onDone: () => void }) {
       ...(testDate ? { targetExamDate: testDate } : {}),
     };
     await saveUser(updated);
-    if (cloudEnabled) await pushSnapshot();
     setBusy(false);
     props.onDone();
   };

@@ -1,7 +1,8 @@
 // =============================================================================
 // src/pages/Settings.tsx
-// Learner settings: display name, target CLI Pisa exam date, and a danger zone to
-// reset all local progress. Everything lives in IndexedDB; there's no account.
+// Learner settings: display name, current level, goal, target CLI Pisa exam date,
+// and a danger zone to reset all progress. Everything lives in IndexedDB on this
+// device — there's no account.
 // =============================================================================
 
 import { useState } from "react";
@@ -10,15 +11,11 @@ import { useAsync } from "../hooks/useAsync.js";
 import { getUser, resetAll, saveUser } from "../db/repositories.js";
 import type { UserRecord } from "../db/store.js";
 import { formatShort, fromISODate } from "../util/date.js";
-import { useAuth } from "../auth/AuthContext.js";
-import { cloudEnabled } from "../cloud/supabase.js";
-import { pushSnapshot } from "../cloud/sync.js";
 import { CEFR_ORDER } from "../types/index.js";
 import type { CefrLevel } from "../types/index.js";
 
 export function Settings() {
   const { loading, error, value, reload } = useAsync<UserRecord>(() => getUser(), []);
-  const auth = useAuth();
   const [name, setName] = useState("");
   const [examDate, setExamDate] = useState("");
   const [level, setLevel] = useState<CefrLevel>("A0");
@@ -50,7 +47,6 @@ export function Settings() {
       goal: goal.trim() || user.goal,
     };
     await saveUser(updated);
-    if (cloudEnabled) await pushSnapshot();
     setSaved(true);
     reload();
     setTimeout(() => setSaved(false), 2500);
@@ -58,28 +54,14 @@ export function Settings() {
 
   const doReset = async () => {
     await resetAll();
-    if (cloudEnabled) await pushSnapshot();
     window.location.reload();
   };
 
   return (
     <>
-      <PageHead title="Settings" sub="Your profile and plan. Progress is saved to your account and syncs across your devices." />
+      <PageHead title="Settings" sub="Your profile and plan. Everything is stored on this device — there's no account, and nothing leaves your browser." />
 
-      {cloudEnabled && auth.user && (
-        <Card title="Account">
-          <div className="row row--between" style={{ flexWrap: "wrap", gap: 12 }}>
-            <div>
-              <div style={{ fontWeight: 600 }}>{auth.user.email}</div>
-              <div className="muted" style={{ fontSize: "0.85rem" }}>Signed in · progress syncs to the cloud</div>
-            </div>
-            <Button onClick={() => auth.signOut()}>Sign out</Button>
-          </div>
-        </Card>
-      )}
-
-      <div style={{ marginTop: cloudEnabled && auth.user ? 16 : 0 }}>
-        <Card title="Profile">
+      <Card title="Profile">
         <div className="settings-field">
           <label htmlFor="set-name">Display name</label>
           <input id="set-name" className="qinput" style={{ padding: 10, fontSize: "1rem" }} value={name} onChange={(e) => setName(e.target.value)} />
@@ -108,14 +90,13 @@ export function Settings() {
           <Button variant="primary" onClick={save}>Save changes</Button>
           {saved && <span className="ok-words">Saved ✓</span>}
         </div>
-        </Card>
-      </div>
+      </Card>
 
       <div style={{ marginTop: 16 }}>
         <Card title="Danger zone">
           <p className="muted" style={{ marginBottom: 12 }}>
             Reset wipes all your progress — completed lessons, scores, vocabulary, mistakes, and study history — back to a
-            clean start{cloudEnabled ? ", including your cloud copy" : ""}. This can't be undone.
+            clean start. This can't be undone.
           </p>
           {confirming ? (
             <div className="row" style={{ gap: 10, flexWrap: "wrap" }}>
