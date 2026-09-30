@@ -1,8 +1,8 @@
 // =============================================================================
 // src/pages/Settings.tsx
-// Learner settings: display name, current level, goal, target CLI Pisa exam date,
-// and a danger zone to reset all progress. Everything lives in IndexedDB on this
-// device — there's no account.
+// Learner settings: account, display name, current level, goal, target CLI Pisa
+// exam date, and a danger zone to reset all progress. When signed in, changes
+// sync to your Netlify Identity profile so they follow you across devices.
 // =============================================================================
 
 import { useState } from "react";
@@ -13,9 +13,12 @@ import type { UserRecord } from "../db/store.js";
 import { formatShort, fromISODate } from "../util/date.js";
 import { CEFR_ORDER } from "../types/index.js";
 import type { CefrLevel } from "../types/index.js";
+import { useAuth } from "../auth/AuthContext.js";
+import { pushSnapshot, scheduleSync } from "../cloud/sync.js";
 
 export function Settings() {
   const { loading, error, value, reload } = useAsync<UserRecord>(() => getUser(), []);
+  const { user: account, signOut } = useAuth();
   const [name, setName] = useState("");
   const [examDate, setExamDate] = useState("");
   const [level, setLevel] = useState<CefrLevel>("A0");
@@ -47,6 +50,7 @@ export function Settings() {
       goal: goal.trim() || user.goal,
     };
     await saveUser(updated);
+    scheduleSync();
     setSaved(true);
     reload();
     setTimeout(() => setSaved(false), 2500);
@@ -54,12 +58,32 @@ export function Settings() {
 
   const doReset = async () => {
     await resetAll();
+    // Persist the wiped state to the profile first, otherwise the next load
+    // would pull the old snapshot back in and undo the reset.
+    await pushSnapshot();
     window.location.reload();
   };
 
   return (
     <>
-      <PageHead title="Settings" sub="Your profile and plan. Everything is stored on this device — there's no account, and nothing leaves your browser." />
+      <PageHead title="Settings" sub="Your account, profile, and plan. When you're signed in, your progress syncs to your account and follows you to any device." />
+
+      {account && (
+        <div style={{ marginBottom: 16 }}>
+          <Card title="Account">
+            <div className="settings-field">
+              <label>Signed in as</label>
+              <span style={{ fontWeight: 600 }}>{account.email}</span>
+              <span className="muted" style={{ fontSize: "0.82rem" }}>
+                Your progress is saved to this account and restored when you log in elsewhere.
+              </span>
+            </div>
+            <div className="row" style={{ marginTop: 8 }}>
+              <Button onClick={() => void signOut()}>Sign out</Button>
+            </div>
+          </Card>
+        </div>
+      )}
 
       <Card title="Profile">
         <div className="settings-field">

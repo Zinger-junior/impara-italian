@@ -17,6 +17,7 @@ import type {
 } from "./store.js";
 import { get, getAll, put, putMany, del, clearStore } from "./idb.js";
 import { toISODate, today } from "../util/date.js";
+import { scheduleSync } from "../cloud/sync.js";
 
 // ---- User -------------------------------------------------------------------
 
@@ -30,6 +31,7 @@ export async function getUser(): Promise<UserRecord> {
 export async function saveUser(user: UserRecord): Promise<void> {
   const db = await getDb();
   await put(db, "meta", user);
+  scheduleSync();
 }
 
 /** Update the target exam date and persist. */
@@ -79,6 +81,7 @@ export async function setLessonCompleted(
   await put(db, "lessonProgress", record);
 
   if (completed) await addStudyMinutes(minutes);
+  else scheduleSync();
 }
 
 /**
@@ -140,6 +143,7 @@ export async function addStudyMinutes(minutes: number): Promise<void> {
     xp: (existing?.xp ?? 0) + minutes * 3,
   };
   await put(db, "studySessions", record);
+  scheduleSync();
 }
 
 // ---- Milestones -------------------------------------------------------------
@@ -155,6 +159,7 @@ export async function getMilestones(): Promise<MilestoneRecord[]> {
 export async function saveQuizResult(record: QuizResultRecord): Promise<void> {
   const db = await getDb();
   await put(db, "quizResults", record);
+  scheduleSync();
 }
 
 export async function getQuizResults(): Promise<QuizResultRecord[]> {
@@ -166,6 +171,7 @@ export async function getQuizResults(): Promise<QuizResultRecord[]> {
 export async function savePronunciationAttempt(record: PronunciationAttemptRecord): Promise<void> {
   const db = await getDb();
   await put(db, "pronunciationAttempts", record);
+  scheduleSync();
 }
 
 export async function getPronunciationAttempts(): Promise<PronunciationAttemptRecord[]> {
@@ -195,6 +201,7 @@ export async function addVocabWord(it: string, en: string, theme?: string): Prom
     ...(theme ? { theme } : {}),
   };
   await put(db, "vocab", record);
+  scheduleSync();
   return true;
 }
 
@@ -219,6 +226,7 @@ export async function addVocabWords(
     });
   }
   if (fresh.length) await putMany(db, "vocab", fresh);
+  if (fresh.length) scheduleSync();
   return fresh.length;
 }
 
@@ -231,11 +239,13 @@ export async function setVocabBox(record: VocabRecord, box: number): Promise<voi
     lastReviewedAt: toISODate(today()),
   };
   await put(db, "vocab", updated);
+  scheduleSync();
 }
 
 export async function deleteVocabWord(id: number): Promise<void> {
   const db = await getDb();
   await del(db, "vocab", id);
+  scheduleSync();
 }
 
 // ---- Mistake log ------------------------------------------------------------
@@ -255,11 +265,13 @@ export async function addMistake(bad: string, good: string, note?: string): Prom
     ...(note && note.trim() ? { note: note.trim() } : {}),
   };
   await put(db, "mistakes", record);
+  scheduleSync();
 }
 
 export async function deleteMistake(id: number): Promise<void> {
   const db = await getDb();
   await del(db, "mistakes", id);
+  scheduleSync();
 }
 
 // ---- Maintenance ------------------------------------------------------------

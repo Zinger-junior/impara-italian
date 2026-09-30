@@ -1,12 +1,19 @@
 // =============================================================================
 // src/app/App.tsx
-// Route table wrapped in the responsive AppShell. HashRouter keeps the app fully
-// client-side. On first run the OnboardingGate shows a short survey before the app.
+// App composition:
+//   AuthProvider → Gate → (onboarding) → HashRouter → AppShell → routes
+// Auth (Netlify Identity) wraps everything; the Gate decides between the login
+// screen and the app and hydrates the signed-in user's saved progress. A small
+// SyncManager inside the router pushes progress back to the user's profile as
+// they move around the app. HashRouter keeps the whole thing client-side.
 // =============================================================================
 
-import { HashRouter, Route, Routes } from "react-router-dom";
+import { HashRouter, Route, Routes, useLocation } from "react-router-dom";
+import { useEffect } from "react";
 import { AppShell } from "../ui/AppShell.js";
-import { OnboardingGate } from "../auth/OnboardingGate.js";
+import { AuthProvider } from "../auth/AuthContext.js";
+import { Gate } from "../auth/Gate.js";
+import { scheduleSync, flushSync } from "../cloud/sync.js";
 import { Dashboard } from "../pages/Dashboard.js";
 import { CurriculumBrowser } from "../pages/CurriculumBrowser.js";
 import { Timeline } from "../pages/Timeline.js";
@@ -25,33 +32,52 @@ import { Verbs } from "../pages/Verbs.js";
 import { Writing } from "../pages/Writing.js";
 import { Settings } from "../pages/Settings.js";
 
+/** Pushes progress to the signed-in profile on navigation and when hiding the tab. */
+function SyncManager() {
+  const location = useLocation();
+  useEffect(() => {
+    scheduleSync();
+  }, [location.pathname]);
+  useEffect(() => {
+    const onHide = () => {
+      if (document.visibilityState === "hidden") void flushSync();
+    };
+    document.addEventListener("visibilitychange", onHide);
+    return () => document.removeEventListener("visibilitychange", onHide);
+  }, []);
+  return null;
+}
+
 export function App() {
   return (
-    <OnboardingGate>
-      <HashRouter>
-        <AppShell>
-          <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/curriculum" element={<CurriculumBrowser />} />
-            <Route path="/grammar" element={<Grammar />} />
-            <Route path="/listening" element={<Listening />} />
-            <Route path="/drill" element={<Drill />} />
-            <Route path="/quiz" element={<Quiz />} />
-            <Route path="/vocabulary" element={<Vocabulary />} />
-            <Route path="/review" element={<Review />} />
-            <Route path="/writing" element={<Writing />} />
-            <Route path="/exam" element={<ExamPage />} />
-            <Route path="/phrasebook" element={<Phrasebook />} />
-            <Route path="/resources" element={<Resources />} />
-            <Route path="/verbs" element={<Verbs />} />
-            <Route path="/guide" element={<Guide />} />
-            <Route path="/timeline" element={<Timeline />} />
-            <Route path="/diagnostics" element={<Diagnostics />} />
-            <Route path="/settings" element={<Settings />} />
-            <Route path="*" element={<Dashboard />} />
-          </Routes>
-        </AppShell>
-      </HashRouter>
-    </OnboardingGate>
+    <AuthProvider>
+      <Gate>
+        <HashRouter>
+          <SyncManager />
+          <AppShell>
+            <Routes>
+              <Route path="/" element={<Dashboard />} />
+              <Route path="/curriculum" element={<CurriculumBrowser />} />
+              <Route path="/grammar" element={<Grammar />} />
+              <Route path="/listening" element={<Listening />} />
+              <Route path="/drill" element={<Drill />} />
+              <Route path="/quiz" element={<Quiz />} />
+              <Route path="/vocabulary" element={<Vocabulary />} />
+              <Route path="/review" element={<Review />} />
+              <Route path="/writing" element={<Writing />} />
+              <Route path="/exam" element={<ExamPage />} />
+              <Route path="/phrasebook" element={<Phrasebook />} />
+              <Route path="/resources" element={<Resources />} />
+              <Route path="/verbs" element={<Verbs />} />
+              <Route path="/guide" element={<Guide />} />
+              <Route path="/timeline" element={<Timeline />} />
+              <Route path="/diagnostics" element={<Diagnostics />} />
+              <Route path="/settings" element={<Settings />} />
+              <Route path="*" element={<Dashboard />} />
+            </Routes>
+          </AppShell>
+        </HashRouter>
+      </Gate>
+    </AuthProvider>
   );
 }

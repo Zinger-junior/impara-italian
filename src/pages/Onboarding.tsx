@@ -13,6 +13,7 @@ import { getUser, saveUser } from "../db/repositories.js";
 import type { UserRecord } from "../db/store.js";
 import { toISODate, today } from "../util/date.js";
 import type { CefrLevel } from "../types/index.js";
+import { pushSnapshot } from "../cloud/sync.js";
 
 const LEVELS: { code: CefrLevel; name: string; blurb: string }[] = [
   { code: "A0", name: "A0 · Complete beginner", blurb: "Never studied Italian — start from the alphabet." },
@@ -67,6 +68,8 @@ export function Onboarding(props: { onDone: () => void }) {
       ...(testDate ? { targetExamDate: testDate } : {}),
     };
     await saveUser(updated);
+    // Persist the completed survey to the signed-in profile (no-op locally).
+    await pushSnapshot();
     setBusy(false);
     props.onDone();
   };

@@ -8,6 +8,7 @@
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { NavLink, useLocation } from "react-router-dom";
+import { useAuth } from "../auth/AuthContext.js";
 
 type Theme = "light" | "dark" | "system";
 const THEME_KEY = "impara.theme";
@@ -73,6 +74,7 @@ export function AppShell(props: { children: ReactNode }) {
   const [navOpen, setNavOpen] = useState(false);
   const [theme, setTheme] = useTheme();
   const location = useLocation();
+  const { user, signOut } = useAuth();
 
   // Close the mobile drawer whenever the route changes.
   useEffect(() => setNavOpen(false), [location.pathname]);
@@ -115,6 +117,15 @@ export function AppShell(props: { children: ReactNode }) {
         </nav>
 
         <div className="spacer" />
+
+        {user && (
+          <div className="nav__account">
+            <div className="nav__account-email" title={user.email}>{user.email}</div>
+            <button className="btn btn--ghost btn--sm" onClick={() => void signOut()}>
+              Sign out
+            </button>
+          </div>
+        )}
 
         <button className="btn btn--ghost" onClick={cycleTheme} aria-label="Change color theme">
           {themeLabel}
